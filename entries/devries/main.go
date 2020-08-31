@@ -42,6 +42,9 @@ func main() {
 	fmt.Printf("\nMessage: %s\nCertificate: %s\n", result.Message, result.Certificate)
 }
 
+// StartRace sends a starting message to the challenge server.
+// The returned string is the path portion of the URL required to
+// get the first maze in for the race.
 func StartRace() (string, error) {
 	client := http.Client{}
 	loginMessage := map[string]string{
@@ -72,6 +75,9 @@ func StartRace() (string, error) {
 	return r.NextMazePath, nil
 }
 
+// GetMaze obtains a maze from the challenge server.
+// The url is the full URL of the maze endpoint. The returned
+// MazeMessage object contains all the information about the maze.
 func GetMaze(url string) (MazeMessage, error) {
 	client := http.Client{}
 	var m MazeMessage
@@ -94,6 +100,11 @@ func GetMaze(url string) (MazeMessage, error) {
 	return m, nil
 }
 
+// SendSolution sends the maze solution to the challenge server.
+// The MazeMessage is required because it contains a reference to the
+// solution endpoint, and the solution string is a series of directions N, S, E, and W
+// required to solve the maze concatenated into a string. A SolutionResult object
+// is returned.
 func SendSolution(m MazeMessage, solution string) (SolutionResult, error) {
 	solutionMessage := MazeSolution{solution}
 	var result SolutionResult
@@ -122,25 +133,29 @@ func SendSolution(m MazeMessage, solution string) (SolutionResult, error) {
 	return result, nil
 }
 
+// A representation of the message returned by the GetMaze method.
 type MazeMessage struct {
-	Name            string       `json:"name"`
-	MazePath        string       `json:"mazePath"`
-	Start           Point        `json:"startingPosition"`
-	End             Point        `json:"endingPosition"`
-	Message         string       `json:"message"`
-	ExampleSolution MazeSolution `json:"exampleSolution",omitempty`
-	Map             [][]string   `json:"map"`
+	Name            string       `json:"name"`                      // Name of the maze
+	MazePath        string       `json:"mazePath"`                  // URL path to POST solution
+	Start           Point        `json:"startingPosition"`          // Starting point
+	End             Point        `json:"endingPosition"`            // Ending point
+	Message         string       `json:"message"`                   // Message to accompany maze
+	ExampleSolution MazeSolution `json:"exampleSolution",omitempty` // Sample of solution
+	Map             [][]string   `json:"map"`                       // 2-D representation of Maze
 }
 
+// A representation of the solution sent to the maze endpoint
 type MazeSolution struct {
-	Directions string `json:"directions"`
+	Directions string `json:"directions"` // Concatenated string containing maze solution
 }
 
+// A point in 2-D space
 type Point struct {
-	X int
-	Y int
+	X int // Horizontal Position
+	Y int // Vertical Position
 }
 
+// UnmarshalJSON unmarshals a point, which is stored as an array of integers, into a point.
 func (p *Point) UnmarshalJSON(b []byte) (err error) {
 	tmp := []interface{}{&p.X, &p.Y}
 
@@ -155,14 +170,15 @@ func (p *Point) UnmarshalJSON(b []byte) (err error) {
 	return nil
 }
 
+// A representation of the response to a submitted solution.
 type SolutionResult struct {
-	Result                 string `json:"result,omitempty"`
-	Message                string `json:"message,omitempty"`
-	ShortestSolutionLength int    `json:"shortestSolutionLength,omitempty"`
-	SolutionLength         int    `json:"yourSolutionLength,omitempty"`
-	Elapsed                int    `json:"elapsed,omitempty"`
-	NextMazePath           string `json:"nextMaze,omitempty"`
-	Certificate            string `json:"certificate,omitempty"`
+	Result                 string `json:"result,omitempty"`                 // "success" if solution is correct
+	Message                string `json:"message,omitempty"`                // Message describing result
+	ShortestSolutionLength int    `json:"shortestSolutionLength,omitempty"` // Shortest possible solution length
+	SolutionLength         int    `json:"yourSolutionLength,omitempty"`     // Length of submitted solution
+	Elapsed                int    `json:"elapsed,omitempty"`                // Seconds elapsed
+	NextMazePath           string `json:"nextMaze,omitempty"`               // Next maze's URL path
+	Certificate            string `json:"certificate,omitempty"`            // Certificate of completion, if race is complete
 }
 
 var directions = map[string]Point{
@@ -172,12 +188,14 @@ var directions = map[string]Point{
 	"W": Point{-1, 0},
 }
 
+// Representation of maze for maze solver.
 type Maze struct {
-	XSize  int
-	YSize  int
-	Values map[Point]string
+	XSize  int              // Horizontal size of maze
+	YSize  int              // Vertical size of maze
+	Values map[Point]string // Value of each position. Space is empty, X is wall, A is start, B is end.
 }
 
+// MapToMaze creates Maze structure from 2-D representation sent by server.
 func MapToMaze(mazeMap [][]string) Maze {
 	var result Maze
 	result.Values = make(map[Point]string)
@@ -193,23 +211,28 @@ func MapToMaze(mazeMap [][]string) Maze {
 	return result
 }
 
+// Representation of state of possible map step.
 type State struct {
 	Position Point
 	Path     string
 }
 
+// Queue of states to evolve by subsequent steps.
 type StateQueue []State
 
+// Create a new state queue
 func NewStateQueue() *StateQueue {
 	r := []State{}
 
 	return (*StateQueue)(&r)
 }
 
+// Add a new state to the state queue for later investigation.
 func (sq *StateQueue) Add(s State) {
 	*sq = append(*sq, s)
 }
 
+// Pop the first state off the state queue.
 func (sq *StateQueue) Pop() State {
 	var r State
 
@@ -221,6 +244,7 @@ func (sq *StateQueue) Pop() State {
 	return r
 }
 
+// Check if additional states are available in queue
 func (sq *StateQueue) Available() bool {
 	if len(*sq) > 0 {
 		return true
@@ -229,6 +253,8 @@ func (sq *StateQueue) Available() bool {
 	}
 }
 
+// Solve maze given Maze structure, and starting point and endpoint.
+// Returns the steps required to solve the maze.
 func solve(maze Maze, start Point, end Point) string {
 	sq := NewStateQueue()
 	seen := make(map[Point]bool)
