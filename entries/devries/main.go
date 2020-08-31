@@ -11,7 +11,8 @@ import (
 func main() {
 	// url := "https://api.noopschallenge.com/mazebot/random?minSize=150&maxSize=200"
 
-	mazePath, err := StartRace()
+	ctx := context.Background()
+	mazePath, err := StartRace(ctx)
 	if err != nil {
 		panic(fmt.Errorf("Error starting race: %s", err))
 	}
@@ -20,7 +21,7 @@ func main() {
 
 	for mazePath != "" {
 		// Read Initial Value
-		m, err := GetMaze("https://api.noopschallenge.com" + mazePath)
+		m, err := GetMaze(ctx, "https://api.noopschallenge.com"+mazePath)
 		if err != nil {
 			panic(fmt.Errorf("Unable to get maze: %s", err))
 		}
@@ -32,7 +33,7 @@ func main() {
 		fmt.Printf("Size: %dx%d\n", maze.XSize, maze.YSize)
 
 		// Send solution
-		result, err = SendSolution(m, r)
+		result, err = SendSolution(ctx, m, r)
 		if err != nil {
 			panic(fmt.Errorf("Error sending result: %s", err))
 		}
@@ -45,7 +46,7 @@ func main() {
 // StartRace sends a starting message to the challenge server.
 // The returned string is the path portion of the URL required to
 // get the first maze in for the race.
-func StartRace() (string, error) {
+func StartRace(ctx context.Context) (string, error) {
 	client := http.Client{}
 	loginMessage := map[string]string{
 		"login": "devries",
@@ -55,7 +56,7 @@ func StartRace() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("Error generating JSON: %s", err)
 	}
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "https://api.noopschallenge.com/mazebot/race/start", bytes.NewBuffer(reqBody))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.noopschallenge.com/mazebot/race/start", bytes.NewBuffer(reqBody))
 	if err != nil {
 		return "", fmt.Errorf("Error creating request: %s", err)
 	}
@@ -78,11 +79,11 @@ func StartRace() (string, error) {
 // GetMaze obtains a maze from the challenge server.
 // The url is the full URL of the maze endpoint. The returned
 // MazeMessage object contains all the information about the maze.
-func GetMaze(url string) (MazeMessage, error) {
+func GetMaze(ctx context.Context, url string) (MazeMessage, error) {
 	client := http.Client{}
 	var m MazeMessage
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return m, fmt.Errorf("Error creating request: %s", err)
 	}
@@ -105,7 +106,7 @@ func GetMaze(url string) (MazeMessage, error) {
 // solution endpoint, and the solution string is a series of directions N, S, E, and W
 // required to solve the maze concatenated into a string. A SolutionResult object
 // is returned.
-func SendSolution(m MazeMessage, solution string) (SolutionResult, error) {
+func SendSolution(ctx context.Context, m MazeMessage, solution string) (SolutionResult, error) {
 	solutionMessage := MazeSolution{solution}
 	var result SolutionResult
 	client := http.Client{}
@@ -114,7 +115,7 @@ func SendSolution(m MazeMessage, solution string) (SolutionResult, error) {
 	if err != nil {
 		return result, fmt.Errorf("Unable to generate solution JSON: %s", err)
 	}
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "https://api.noopschallenge.com"+m.MazePath, bytes.NewBuffer(reqBody))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.noopschallenge.com"+m.MazePath, bytes.NewBuffer(reqBody))
 	if err != nil {
 		return result, fmt.Errorf("Unable to generate post request: %s", err)
 	}
