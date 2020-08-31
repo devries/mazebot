@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -46,7 +47,7 @@ func TestSolver(t *testing.T) {
 func TestRandom(t *testing.T) {
 	url := "https://api.noopschallenge.com/mazebot/random"
 
-	m, err := GetMaze(url)
+	m, err := GetMaze(context.Background(), url)
 	if err != nil {
 		t.Errorf("Unable to get maze: %s", err)
 	}
@@ -55,7 +56,7 @@ func TestRandom(t *testing.T) {
 
 	r := solve(maze, m.Start, m.End)
 
-	result, err := SendSolution(m, r)
+	result, err := SendSolution(context.Background(), m, r)
 	if err != nil {
 		t.Errorf("Error sending result: %s", err)
 	}
