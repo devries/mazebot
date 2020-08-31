@@ -37,7 +37,10 @@ func TestSolver(t *testing.T) {
 
 	maze := MapToMaze(m.Map)
 
-	r := solve(maze, m.Start, m.End)
+	r, err := solve(context.Background(), maze, m.Start, m.End)
+	if err != nil {
+		t.Errorf("Unable to solve maze: %s", err)
+	}
 	expectation := "WWNNEEEEEEESSSSSSWWSSWWWWWWNNNNEES"
 	if r != expectation {
 		t.Errorf("Got %s, expected %s", r, expectation)
@@ -54,7 +57,10 @@ func TestRandom(t *testing.T) {
 
 	maze := MapToMaze(m.Map)
 
-	r := solve(maze, m.Start, m.End)
+	r, err := solve(context.Background(), maze, m.Start, m.End)
+	if err != nil {
+		t.Errorf("Unable to solve maze: %s", err)
+	}
 
 	result, err := SendSolution(context.Background(), m, r)
 	if err != nil {

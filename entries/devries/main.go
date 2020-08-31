@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 func main() {
 	// url := "https://api.noopschallenge.com/mazebot/random?minSize=150&maxSize=200"
 
-	ctx := context.Background()
+	ctx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancelFunc()
 	mazePath, err := StartRace(ctx)
 	if err != nil {
 		panic(fmt.Errorf("Error starting race: %s", err))
@@ -29,7 +31,10 @@ func main() {
 		// Solve maze
 		maze := MapToMaze(m.Map)
 
-		r := solve(maze, m.Start, m.End)
+		r, err := solve(ctx, maze, m.Start, m.End)
+		if err != nil {
+			panic(fmt.Errorf("Error solving: %s", err))
+		}
 		fmt.Printf("Size: %dx%d\n", maze.XSize, maze.YSize)
 
 		// Send solution
@@ -256,7 +261,7 @@ func (sq *StateQueue) Available() bool {
 
 // Solve maze given Maze structure, and starting point and endpoint.
 // Returns the steps required to solve the maze.
-func solve(maze Maze, start Point, end Point) string {
+func solve(ctx context.Context, maze Maze, start Point, end Point) (string, error) {
 	sq := NewStateQueue()
 	seen := make(map[Point]bool)
 
@@ -265,33 +270,38 @@ func solve(maze Maze, start Point, end Point) string {
 	seen[start] = true
 
 	for sq.Available() {
-		state := sq.Pop()
-		for dName, d := range directions {
-			p := Point{state.Position.X + d.X, state.Position.Y + d.Y}
+		select {
+		case <-ctx.Done():
+			return "", fmt.Errorf("Premature cancellation: %s", ctx.Err())
+		default:
+			state := sq.Pop()
+			for dName, d := range directions {
+				p := Point{state.Position.X + d.X, state.Position.Y + d.Y}
 
-			newState := State{p, state.Path + dName}
+				newState := State{p, state.Path + dName}
 
-			if seen[p] {
-				// Already seen this point
-				continue
-			} else if maze.Values[p] == "X" {
-				// This is a wall
-				continue
-			} else if p.X >= maze.XSize || p.X < 0 {
-				// Out of bounds in X
-				continue
-			} else if p.Y >= maze.YSize || p.Y < 0 {
-				// Out of bounds in Y
-				continue
-			} else if p == end {
-				// This is the goal
-				return newState.Path
-			} else {
-				sq.Add(newState)
-				seen[p] = true
+				if seen[p] {
+					// Already seen this point
+					continue
+				} else if maze.Values[p] == "X" {
+					// This is a wall
+					continue
+				} else if p.X >= maze.XSize || p.X < 0 {
+					// Out of bounds in X
+					continue
+				} else if p.Y >= maze.YSize || p.Y < 0 {
+					// Out of bounds in Y
+					continue
+				} else if p == end {
+					// This is the goal
+					return newState.Path, nil
+				} else {
+					sq.Add(newState)
+					seen[p] = true
+				}
 			}
 		}
 	}
 
-	return ""
+	return "", fmt.Errorf("Solution not found")
 }
